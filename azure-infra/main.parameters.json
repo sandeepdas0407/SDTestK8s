@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "East US"
+    },
+    "resourceGroupName": {
+      "value": "rg-blog-app"
+    },
+    "aksName": {
+      "value": "aks-blog-app"
+    },
+    "nodeCount": {
+      "value": 2
+    },
+    "vmSize": {
+      "value": "Standard_D2s_v3"
+    }
+  }
+}

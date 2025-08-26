@@ -1,0 +1,71 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: |
+        cd WebApplication1
+        dotnet restore
+
+    - name: Build application
+      run: |
+        cd WebApplication1
+        dotnet build --no-restore --configuration Release
+
+    - name: Run tests
+      run: |
+        cd WebApplication1
+        dotnet test --no-build --configuration Release --verbosity normal
+
+    - name: Code quality analysis
+      run: |
+        cd WebApplication1
+        dotnet format --verify-no-changes --verbosity normal
+
+    - name: Validate Docker build
+      run: |
+        cd WebApplication1
+        dotnet publish -c Release -o ../publish --self-contained -r linux-x64
+        cd ..
+        docker build -t test-image .
+
+    - name: Validate Kubernetes manifests
+      run: |
+        # Install kubeval for manifest validation
+        wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+        tar xf kubeval-linux-amd64.tar.gz
+        sudo mv kubeval /usr/local/bin
+        
+        # Validate K8s manifests
+        kubeval k8s/k8s-all-in-one.yaml
+        kubeval k8s/loadbalancer-service.yaml
+
+    - name: Comment PR
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ All validation checks passed! This PR is ready for review.'
+          })

@@ -1,0 +1,67 @@
+name: Infrastructure Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - destroy
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - development
+
+env:
+  AZURE_RESOURCE_GROUP: 'rg-blog-app'
+  AZURE_LOCATION: 'East US'
+
+jobs:
+  infrastructure:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy Infrastructure
+      if: github.event.inputs.action == 'deploy'
+      run: |
+        echo "Deploying infrastructure to ${{ github.event.inputs.environment }}..."
+        
+        # Create resource group if it doesn't exist
+        az group create --name ${{ env.AZURE_RESOURCE_GROUP }} --location "${{ env.AZURE_LOCATION }}"
+        
+        # Deploy Bicep template
+        cd azure-infra
+        az deployment group create \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --template-file main.bicep \
+          --parameters main.parameters.json \
+          --parameters environmentName=${{ github.event.inputs.environment }}
+
+    - name: Destroy Infrastructure
+      if: github.event.inputs.action == 'destroy'
+      run: |
+        echo "Destroying infrastructure..."
+        az group delete --name ${{ env.AZURE_RESOURCE_GROUP }} --yes --no-wait
+
+    - name: Output Infrastructure Details
+      if: github.event.inputs.action == 'deploy'
+      run: |
+        echo "Infrastructure deployment completed!"
+        az resource list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --output table
